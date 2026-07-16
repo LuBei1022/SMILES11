@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "source_sample.schema.json",
+  "title": "Unified RAG Source Sample",
+  "description": "统一的源样本格式：把英文(HotpotQA)与俄文(retrieval_dataset)两份原始数据归一为同一结构，作为后续 Chunking / Retrieval / Generation 流水线的输入。此格式只描述『问题 + 待检索的源文档 + 参考答案 + 金标准证据』，不包含任何检索/生成的运行结果。",
+  "type": "object",
+  "required": ["sample_id", "source_dataset", "language", "question", "reference_answer", "source_documents"],
+  "additionalProperties": false,
+  "properties": {
+    "sample_id": {
+      "type": "string",
+      "description": "样本唯一 ID。英文用原始 id；俄文用 ru__retrieval_dataset__000123 形式生成。"
+    },
+    "source_dataset": {
+      "type": "string",
+      "description": "来源数据集标识。",
+      "enum": ["hotpot_en", "retrieval_ru"]
+    },
+    "language": {
+      "type": "string",
+      "description": "语言代码。",
+      "enum": ["en", "ru"]
+    },
+    "question": {
+      "type": "string",
+      "minLength": 1,
+      "description": "用户问题 / 查询。"
+    },
+    "reference_answer": {
+      "type": "string",
+      "description": "金标准参考答案（用于评价，不喂给生成器）。"
+    },
+    "source_documents": {
+      "type": "array",
+      "minItems": 1,
+      "description": "待被切分与检索的源文档池。英文为多篇结构化文档；俄文为单篇长文本(context blob)。",
+      "items": {
+        "type": "object",
+        "required": ["document_id", "text"],
+        "additionalProperties": false,
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "description": "文档唯一 ID，样本内唯一。"
+          },
+          "title": {
+            "type": ["string", "null"],
+            "description": "文档标题；俄文无标题时为 null。"
+          },
+          "text": {
+            "type": "string",
+            "description": "文档全文（句子拼接后的完整文本）。"
+          },
+          "sentences": {
+            "type": ["array", "null"],
+            "description": "可选：按句拆分的列表。英文保留以支持 sentence_index 定位；俄文为 null。",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "gold_evidence": {
+      "type": ["array", "null"],
+      "description": "金标准证据。统一形态：始终提供 document_id 与 gold_text；英文额外提供 sentence_index，俄文该字段为 null 并用字符偏移定位。俄文若无标注则整体可为 null。",
+      "items": {
+        "type": "object",
+        "required": ["document_id", "gold_text"],
+        "additionalProperties": false,
+        "properties": {
+          "document_id": {
+            "type": "string",
+            "description": "证据所在文档 ID，对应 source_documents.document_id。"
+          },
+          "sentence_index": {
+            "type": ["integer", "null"],
+            "description": "英文：证据句在该文档 sentences 中的下标；俄文：null。"
+          },
+          "gold_text": {
+            "type": "string",
+            "description": "金标准证据文本本身（英文为该句，俄文为金标准段落）。"
+          },
+          "char_start": {
+            "type": ["integer", "null"],
+            "description": "可选：gold_text 在所属文档 text 中的起始字符位置（俄文用于 chunk 金标准保留检查）。"
+          },
+          "char_end": {
+            "type": ["integer", "null"],
+            "description": "可选：gold_text 在所属文档 text 中的结束字符位置。"
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "description": "自由元数据。英文放 type/level 及 legacy_output（原 GPT-3.5 结果，仅作旧结果对照，不进入主流程）；俄文放 source_line 等。未知的流水线配置一律不虚构。",
+      "additionalProperties": true
+    }
+  }
+}
