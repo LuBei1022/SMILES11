@@ -53,7 +53,7 @@ SMILES11/
 │   │   └── context_builder.py         # ranked, deduped, token-budgeted context assembly
 │   └── generation/
 │       ├── prompt_builder.py          # versioned prompts (grounded_v1)
-│       └── llm_client.py              # swappable LLM backends: GeminiClient / DryRunClient
+│       └── llm_client.py              # swappable LLM backends: ZhipuClient (GLM) / GeminiClient / DryRunClient
 │
 ├── scripts/                           # one CLI per stage; each takes --input / --output
 │   ├── normalize_english_data.py      # HotpotQA (EN)  -> source samples
@@ -102,7 +102,8 @@ truth and must never be read by the evaluator.
 Install dependencies:
 
 ```bash
-pip install tiktoken rank_bm25 sentence-transformers numpy jsonschema google-genai
+pip install tiktoken rank_bm25 sentence-transformers numpy jsonschema zhipuai
+# (google-genai only needed if using the optional --backend gemini)
 ```
 
 Run the full pipeline (English, BM25 baseline shown):
@@ -129,14 +130,18 @@ python scripts/run_context.py \
   --input data/retrieved/english_bm25.jsonl \
   --output data/context/english_bm25_context.jsonl
 
-# 5. generate -> full traces
-export GEMINI_API_KEY=...          # required for --backend gemini
+# 5. generate -> full traces  (Zhipu GLM, free tier)
+export ZHIPU_API_KEY=...           # required for --backend zhipu
 python scripts/run_generation.py \
   --input data/context/english_bm25_context.jsonl \
-  --output data/traces/english_bm25_gemini.jsonl \
-  --pipeline-id en_bm25_gemini_baseline_v1 \
-  --backend gemini --model gemini-3.5-flash --sleep 6 --resume
+  --output data/traces/english_bm25_glm.jsonl \
+  --pipeline-id en_bm25_glm45flash_baseline_v1 \
+  --backend zhipu --model glm-4.5-flash \
+  --max-output-tokens 512 --sleep 1 --resume
 ```
+
+The generation backend is swappable: `--backend zhipu` (GLM, current default choice),
+`--backend gemini` (Google Gemini), or `--backend dry-run` (offline placeholder).
 
 Russian: swap the raw input and use `normalize_russian_data.py`; all later stages
 are identical.
