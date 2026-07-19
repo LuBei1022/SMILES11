@@ -1,0 +1,194 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "full_trace.schema.json",
+  "title": "Full RAG Trace",
+  "description": "一条完整 RAG 运行记录（trace）：由 run_generation.py 组装，累积了从源文档、切块、检索、上下文构造到答案生成的全过程。这是评估/诊断框架（Metric Engine、诊断、Pipeline 聚合）的输入格式。注意：injected_fault 是给验证用的真值标签，评估器不得读取它。",
+  "type": "object",
+  "required": [
+    "trace_id", "source_record_id", "pipeline_id", "language",
+    "query", "source_documents", "chunks", "retrieval",
+    "context_construction", "generation", "runtime"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "trace_id": {
+      "type": "string",
+      "description": "该 trace 的唯一 ID = source_record_id + '__' + pipeline_id。"
+    },
+    "source_record_id": {
+      "type": "string",
+      "description": "原始样本 ID（同一问题在不同 pipeline 下 source_record_id 相同、trace_id 不同）。"
+    },
+    "pipeline_id": {
+      "type": "string",
+      "description": "产生该 trace 的 pipeline 配置标识，用于 Pipeline 级聚合。"
+    },
+    "language": { "type": "string", "enum": ["en", "ru"] },
+    "query": { "type": "string", "description": "用户问题。" },
+    "reference_answer": {
+      "type": ["string", "null"],
+      "description": "金标准参考答案（评价用，未喂给生成器）。"
+    },
+
+    "gold_evidence": {
+      "type": ["array", "null"],
+      "description": "金标准证据；chunking 阶段追加了它落在哪些 chunk、是否被完整保留。",
+      "items": {
+        "type": "object",
+        "required": ["document_id", "gold_text"],
+        "additionalProperties": true,
+        "properties": {
+          "document_id": { "type": "string" },
+          "sentence_index": { "type": ["integer", "null"] },
+          "gold_text": { "type": "string" },
+          "char_start": { "type": ["integer", "null"] },
+          "char_end": { "type": ["integer", "null"] },
+          "covering_chunk_ids": {
+            "type": "array", "items": { "type": "string" },
+            "description": "金标准文本落入的 chunk id 列表。"
+          },
+          "is_preserved": {
+            "type": "boolean",
+            "description": "是否存在某个 chunk 完整包含该证据（未被切开）。"
+          },
+          "locate_ok": { "type": "boolean" }
+        }
+      }
+    },
+
+    "source_documents": {
+      "type": "array",
+      "description": "待检索的源文档池。",
+      "items": {
+        "type": "object",
+        "required": ["document_id", "text"],
+        "additionalProperties": true,
+        "properties": {
+          "document_id": { "type": "string" },
+          "title": { "type": ["string", "null"] },
+          "text": { "type": "string" },
+          "sentences": { "type": ["array", "null"], "items": { "type": "string" } }
+        }
+      }
+    },
+
+    "chunks": {
+      "type": "array",
+      "description": "切块结果。",
+      "items": {
+        "type": "object",
+        "required": ["chunk_id", "document_id", "text"],
+        "additionalProperties": true,
+        "properties": {
+          "chunk_id": { "type": "string" },
+          "document_id": { "type": "string" },
+          "text": { "type": "string" },
+          "chunk_index": { "type": "integer" },
+          "start_char": { "type": "integer" },
+          "end_char": { "type": "integer" },
+          "token_count": { "type": "integer" }
+        }
+      }
+    },
+
+    "retrieval": {
+      "type": "object",
+      "description": "检索阶段：方法、配置、检索到的 chunk 及 Recall@k/Hit@k。",
+      "required": ["method", "top_k", "retrieved_chunks"],
+      "additionalProperties": true,
+      "properties": {
+        "method": { "type": "string", "enum": ["bm25", "dense"] },
+        "top_k": { "type": "integer" },
+        "embedding_model": { "type": ["string", "null"] },
+        "retrieved_chunks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["chunk_id", "rank", "score", "text"],
+            "additionalProperties": true,
+            "properties": {
+              "chunk_id": { "type": "string" },
+              "document_id": { "type": "string" },
+              "rank": { "type": "integer" },
+              "score": { "type": "number" },
+              "text": { "type": "string" }
+            }
+          }
+        },
+        "eval": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "recall_at_k": { "type": ["number", "null"] },
+            "hit_at_k": { "type": ["integer", "null"] },
+            "n_gold_chunks": { "type": "integer" }
+          }
+        }
+      }
+    },
+
+    "context_construction": {
+      "type": "object",
+      "description": "上下文构造：最终 context 及构造留痕。",
+      "required": ["selected_chunk_ids", "final_context"],
+      "additionalProperties": true,
+      "properties": {
+        "selected_chunk_ids": { "type": "array", "items": { "type": "string" } },
+        "dropped_chunk_ids": { "type": "array", "items": { "type": "string" } },
+        "deduplicated_chunk_ids": { "type": "array", "items": { "type": "string" } },
+        "context_token_count": { "type": "integer" },
+        "truncated": { "type": "boolean" },
+        "final_context": { "type": "string" },
+        "eval": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "gold_in_context": { "type": ["integer", "null"] },
+            "n_gold_chunks": { "type": "integer" }
+          }
+        }
+      }
+    },
+
+    "generation": {
+      "type": "object",
+      "description": "生成阶段：最终答案、模型/配置、token 与延迟。",
+      "required": ["final_answer", "model_name", "status"],
+      "additionalProperties": true,
+      "properties": {
+        "final_answer": { "type": "string" },
+        "model_name": { "type": "string" },
+        "temperature": { "type": "number" },
+        "prompt_version": { "type": "string" },
+        "final_prompt": { "type": "string" },
+        "latency_ms": { "type": ["integer", "null"] },
+        "input_tokens": { "type": ["integer", "null"] },
+        "output_tokens": { "type": ["integer", "null"] },
+        "status": { "type": "string", "enum": ["success", "error"] },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+
+    "pipeline_config": {
+      "type": "object",
+      "description": "各阶段配置汇总（chunking、context_builder、以及原始 metadata）。字段随实现演进，故不限制。",
+      "additionalProperties": true
+    },
+
+    "injected_fault": {
+      "type": ["object", "null"],
+      "description": "受控故障注入的真值标签（未注入则为 null）。仅用于最终验证对照，评估器/诊断器不得读取，以免作弊。"
+    },
+
+    "runtime": {
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": true,
+      "properties": {
+        "run_id": { "type": "string" },
+        "status": { "type": "string" },
+        "error": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
