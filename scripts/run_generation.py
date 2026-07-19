@@ -64,7 +64,7 @@ def main():
     ap.add_argument("--input", required=True)
     ap.add_argument("--output", required=True)
     ap.add_argument("--pipeline-id", required=True)
-    ap.add_argument("--backend", choices=["gemini", "dry-run"], default="dry-run")
+    ap.add_argument("--backend", choices=["gemini", "zhipu", "dry-run"], default="dry-run")
     ap.add_argument("--model", default="gemini-1.5-flash")
     ap.add_argument("--prompt-version", default="grounded_v1")
     ap.add_argument("--temperature", type=float, default=0.0)
