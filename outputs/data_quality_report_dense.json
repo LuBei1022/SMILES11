@@ -1,0 +1,212 @@
+{
+  "report_generated": "2026-07-19T14:47:14.894378",
+  "total_traces": 500,
+  "usable_traces": 497,
+  "problematic_traces": 3,
+  "usable_ratio": 0.994,
+  "severity_distribution": {
+    "medium": 207,
+    "none": 290,
+    "high": 3
+  },
+  "tag_distribution": {
+    "gold_evidence_partial_in_context": 191,
+    "gold_evidence_not_in_context": 18,
+    "duplicate_retrieved_chunks": 2,
+    "generation_status_error": 3,
+    "empty_generated_answer": 3,
+    "answer_truncated": 1
+  },
+  "gold_statistics": {
+    "gold_present_any": 482,
+    "gold_present_any_ratio": 0.964,
+    "gold_present_all": 291,
+    "gold_present_all_ratio": 0.582,
+    "gold_none": 18,
+    "gold_none_ratio": 0.036
+  },
+  "by_pipeline": {
+    "en_dense_glm45flash_baseline_v1": {
+      "total": 500,
+      "usable": 497,
+      "usable_ratio": 0.994,
+      "top_issues": {
+        "gold_evidence_partial_in_context": 191,
+        "gold_evidence_not_in_context": 18,
+        "generation_status_error": 3,
+        "empty_generated_answer": 3,
+        "duplicate_retrieved_chunks": 2
+      }
+    }
+  },
+  "example_problems": {
+    "gold_evidence_partial_in_context": [
+      {
+        "trace_id": "5a8b57f25542995d1e6f1371__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ]
+        },
+        "severity": "medium"
+      },
+      {
+        "trace_id": "5a8c7595554299585d9e36b6__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ]
+        },
+        "severity": "medium"
+      },
+      {
+        "trace_id": "5a8e3ea95542995a26add48d__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ]
+        },
+        "severity": "medium"
+      }
+    ],
+    "gold_evidence_not_in_context": [
+      {
+        "trace_id": "5ab29c24554299449642c932__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "no gold evidence chunks in context (gold chunks: 2)"
+          ]
+        },
+        "severity": "medium"
+      },
+      {
+        "trace_id": "5a8e1027554299653c1aa15f__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "no gold evidence chunks in context (gold chunks: 2)"
+          ]
+        },
+        "severity": "medium"
+      },
+      {
+        "trace_id": "5a87c13f5542996e4f30890c__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "no gold evidence chunks in context (gold chunks: 2)"
+          ]
+        },
+        "severity": "medium"
+      }
+    ],
+    "duplicate_retrieved_chunks": [
+      {
+        "trace_id": "5ae5aba0554299546bf82f17__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "retrieval": [
+            "duplicate chunk texts found"
+          ],
+          "context_construction": [
+            "no gold evidence chunks in context (gold chunks: 2)"
+          ]
+        },
+        "severity": "medium"
+      },
+      {
+        "trace_id": "5ae5e1345542996de7b71a50__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "retrieval": [
+            "duplicate chunk texts found"
+          ],
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ]
+        },
+        "severity": "medium"
+      }
+    ],
+    "generation_status_error": [
+      {
+        "trace_id": "5ae33c4d5542992f92d82262__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      },
+      {
+        "trace_id": "5ae4d3c95542990ba0bbb165__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ],
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      },
+      {
+        "trace_id": "5a85dfcc5542994775f60673__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ],
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      }
+    ],
+    "empty_generated_answer": [
+      {
+        "trace_id": "5ae33c4d5542992f92d82262__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      },
+      {
+        "trace_id": "5ae4d3c95542990ba0bbb165__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ],
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      },
+      {
+        "trace_id": "5a85dfcc5542994775f60673__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ],
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      }
+    ],
+    "answer_truncated": [
+      {
+        "trace_id": "5ac2bbd0554299218029db09__en_dense_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ],
+          "generation": [
+            "answer appears truncated"
+          ]
+        },
+        "severity": "medium"
+      }
+    ]
+  }
+}

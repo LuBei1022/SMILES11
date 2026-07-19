@@ -1,0 +1,97 @@
+{
+  "total": 17,
+  "exact_matches": 14,
+  "partial_matches": 0,
+  "mismatches": 3,
+  "accuracy": 0.8235294117647058,
+  "partial_accuracy": 0.8235294117647058,
+  "by_class": {
+    "out_of_scope": {
+      "total": 3,
+      "correct": 3
+    },
+    "chunking/retrieval": {
+      "total": 3,
+      "correct": 0
+    },
+    "retrieval": {
+      "total": 4,
+      "correct": 4
+    },
+    "unknown": {
+      "total": 2,
+      "correct": 2
+    },
+    "generation": {
+      "total": 3,
+      "correct": 3
+    },
+    "chunking": {
+      "total": 2,
+      "correct": 2
+    }
+  },
+  "by_fault_type": {
+    "out_of_scope": {
+      "total": 3,
+      "correct": 3
+    },
+    "distractor_context": {
+      "total": 3,
+      "correct": 0
+    },
+    "missing_evidence": {
+      "total": 2,
+      "correct": 2
+    },
+    "irrelevant_document": {
+      "total": 2,
+      "correct": 2
+    },
+    "corrupted_query": {
+      "total": 2,
+      "correct": 2
+    },
+    "contradictory_answer": {
+      "total": 2,
+      "correct": 2
+    },
+    "chunk_merge": {
+      "total": 1,
+      "correct": 1
+    },
+    "unsupported_answer": {
+      "total": 1,
+      "correct": 1
+    },
+    "chunk_truncation": {
+      "total": 1,
+      "correct": 1
+    }
+  },
+  "confusion_matrix": {
+    "chunking/retrieval": {
+      "chunking": 3
+    }
+  },
+  "disagreements": [
+    {
+      "trace_id": "5a7d3470554299452d57bb56__en_dense_glm45flash_baseline_v1",
+      "expected": "chunking/retrieval",
+      "human": "chunking",
+      "fault_type": "distractor_context"
+    },
+    {
+      "trace_id": "5ab6d09255429954757d337d__en_dense_glm45flash_baseline_v1",
+      "expected": "chunking/retrieval",
+      "human": "chunking",
+      "fault_type": "distractor_context"
+    },
+    {
+      "trace_id": "5ab802085542990e739ec7ca__en_dense_glm45flash_baseline_v1",
+      "expected": "chunking/retrieval",
+      "human": "chunking",
+      "fault_type": "distractor_context"
+    }
+  ]
+}

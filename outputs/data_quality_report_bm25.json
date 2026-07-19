@@ -1,0 +1,186 @@
+{
+  "report_generated": "2026-07-19T14:47:10.454321",
+  "total_traces": 500,
+  "usable_traces": 496,
+  "problematic_traces": 4,
+  "usable_ratio": 0.992,
+  "severity_distribution": {
+    "medium": 206,
+    "none": 289,
+    "high": 4,
+    "low": 1
+  },
+  "tag_distribution": {
+    "gold_evidence_not_in_context": 13,
+    "gold_evidence_partial_in_context": 194,
+    "generation_status_error": 4,
+    "empty_generated_answer": 4,
+    "duplicate_retrieved_chunks": 1,
+    "chunk_truncated": 1
+  },
+  "gold_statistics": {
+    "gold_present_any": 487,
+    "gold_present_any_ratio": 0.974,
+    "gold_present_all": 293,
+    "gold_present_all_ratio": 0.586,
+    "gold_none": 13,
+    "gold_none_ratio": 0.026
+  },
+  "by_pipeline": {
+    "en_bm25_glm45flash_baseline_v1": {
+      "total": 500,
+      "usable": 496,
+      "usable_ratio": 0.992,
+      "top_issues": {
+        "gold_evidence_partial_in_context": 194,
+        "gold_evidence_not_in_context": 13,
+        "generation_status_error": 4,
+        "empty_generated_answer": 4,
+        "duplicate_retrieved_chunks": 1
+      }
+    }
+  },
+  "example_problems": {
+    "gold_evidence_not_in_context": [
+      {
+        "trace_id": "5a8b57f25542995d1e6f1371__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "no gold evidence chunks in context (gold chunks: 2)"
+          ]
+        },
+        "severity": "medium"
+      },
+      {
+        "trace_id": "5ab6d09255429954757d337d__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "no gold evidence chunks in context (gold chunks: 2)"
+          ]
+        },
+        "severity": "medium"
+      },
+      {
+        "trace_id": "5a722b8655429971e9dc9329__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "no gold evidence chunks in context (gold chunks: 2)"
+          ]
+        },
+        "severity": "medium"
+      }
+    ],
+    "gold_evidence_partial_in_context": [
+      {
+        "trace_id": "5a8c7595554299585d9e36b6__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ]
+        },
+        "severity": "medium"
+      },
+      {
+        "trace_id": "5a87ab905542996e4f3088c1__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ]
+        },
+        "severity": "medium"
+      },
+      {
+        "trace_id": "5a8db19d5542994ba4e3dd00__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ]
+        },
+        "severity": "medium"
+      }
+    ],
+    "generation_status_error": [
+      {
+        "trace_id": "5abf63f15542997ec76fd3ea__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      },
+      {
+        "trace_id": "5ae33c4d5542992f92d82262__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      },
+      {
+        "trace_id": "5a85dfcc5542994775f60673__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      }
+    ],
+    "empty_generated_answer": [
+      {
+        "trace_id": "5abf63f15542997ec76fd3ea__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      },
+      {
+        "trace_id": "5ae33c4d5542992f92d82262__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      },
+      {
+        "trace_id": "5a85dfcc5542994775f60673__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "generation": [
+            "final_answer is empty"
+          ]
+        },
+        "severity": "high"
+      }
+    ],
+    "duplicate_retrieved_chunks": [
+      {
+        "trace_id": "5ae5aba0554299546bf82f17__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "retrieval": [
+            "duplicate chunk texts found"
+          ]
+        },
+        "severity": "low"
+      }
+    ],
+    "chunk_truncated": [
+      {
+        "trace_id": "5abc3a65554299700f9d782d__en_bm25_glm45flash_baseline_v1",
+        "issues": {
+          "retrieved_chunks[1]": [
+            "appears truncated"
+          ],
+          "context_construction": [
+            "partial gold evidence: 1/2 chunks in context"
+          ]
+        },
+        "severity": "medium"
+      }
+    ]
+  }
+}
