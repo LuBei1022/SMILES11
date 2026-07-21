@@ -1,0 +1,1 @@
+{"trace_id":"fixture-bad","language":"en","query":"broken","gold_evidence":[{"covering_chunk_ids":["c1"]}],"chunks":"not-a-list","retrieval":{"retrieved_chunks":"not-a-list"},"context_construction":"not-an-object","generation":{"final_answer":"answer","status":"success"}}
