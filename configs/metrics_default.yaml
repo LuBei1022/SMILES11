@@ -1,0 +1,14 @@
+metrics:
+  retrieval:
+    k: 5
+    precision_high: 0.8
+  chunking:
+    integrity_intact: 0.8
+  context:
+    noise_low: 0.2
+    noise_moderate: 0.5
+  generation:
+    relevance_relevant: 0.5
+    sentence_support_threshold: 0.5
+    faithfulness_supported: 0.8
+    faithfulness_partial: 0.5
