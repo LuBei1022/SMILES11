@@ -2,7 +2,7 @@
 
 Part of the SMILES 2026 project *"Automatic Evaluation & Fault-Diagnosis Framework for RAG"*.
 
-This repository covers the **data side** of the project, in two parts:
+This repository covers the **data and metric side** of the project, in three parts:
 
 - **Part A — RAG Trace Platform.** Takes heterogeneous raw QA datasets (English
   and Russian), runs them through a fully configurable, fully logged RAG
@@ -12,9 +12,13 @@ This repository covers the **data side** of the project, in two parts:
   validates their quality, extracts *healthy* traces (gold evidence present),
   injects nine controlled fault types, and cross-checks against human
   annotation to produce a labeled test set.
+- **Part C — Metric Engine.** Computes 11 component-level metrics over the
+  traces and measures each metric's sensitivity to every injected fault type
+  (paired fault-vs-healthy deltas), producing the evidence that the metrics can
+  actually localize faults.
 
-The resulting labeled traces feed the *separate* evaluation & diagnosis
-framework (metrics, fault localization, pipeline-level aggregation). Fault
+The metric outputs feed the **diagnosis layer** (trace-level fault labelling and
+pipeline-level aggregation), which is the remaining downstream step. Fault
 labels live in the trace as ground truth and must never be read by the
 evaluator.
 
@@ -30,8 +34,13 @@ Part B — Quality & fault injection
                 Annotation templates → Human validation → Comparison
      [done]        [done]           [done]           [done]        [done]
 
-Downstream (separate repo): Metric Engine → Diagnosis → Pipeline aggregation
-     [future]
+Part C — Metric Engine
+  Traces + controlled failures → 11 component metrics →
+                                 paired sensitivity analysis
+     [done]                        [done]                 [done]
+
+Downstream: Trace-level diagnosis → Pipeline-level aggregation
+     [in progress]
 ```
 
 ## Repository layout
@@ -54,9 +63,10 @@ SMILES11/
 │   ├── generation/
 │   │   ├── prompt_builder.py          # versioned prompts (grounded_v1)
 │   │   └── llm_client.py              # swappable backends: ZhipuClient (GLM) / GeminiClient / DryRunClient
-│   └── data/
-│       ├── quality_checker.py         # trace quality validation (Part B)
-│       └── fault_injection.py         # controlled fault generation (Part B)
+│   ├── data/
+│   │   ├── quality_checker.py         # trace quality validation (Part B)
+│   │   └── fault_injection.py         # controlled fault generation (Part B)
+│   └── metrics/                       # 11 component-level metrics (Part C)
 │
 ├── scripts/                           # one CLI per stage; each takes --input / --output
 │   ├── normalize_english_data.py      # HotpotQA (EN)  -> source samples
@@ -84,9 +94,16 @@ SMILES11/
 │   └── controlled_failures/           # Part B: injected-fault traces (bm25/ , dense/)
 │
 ├── docs/
-│   └── annotation_guideline.md        # annotation instructions (Part B)
+│   ├── annotation_guideline.md        # annotation instructions (Part B)
+│   └── metric_engine_design.md        # metric definitions & rationale (Part C)
 │
-├── outputs/                           # quality reports & problematic traces
+├── tests/
+│   └── metrics/                       # 39 unit tests for the metric engine
+│
+├── outputs/                           # quality reports, problematic traces,
+│   ├── controlled_failure_core_results.csv   # paired fault-vs-healthy deltas
+│   └── controlled_failure_heatmap.png        # metric sensitivity heatmap
+│
 └── experiments/
     └── human_validation/              # annotation results & comparison reports
 ```
@@ -239,6 +256,38 @@ python scripts/compare_with_human.py \
 
 ---
 
+# Part C — Metric Engine
+
+Computes component-level metrics over full traces, then measures how each metric
+responds to each injected fault. Design rationale and per-metric definitions live
+in `docs/metric_engine_design.md`.
+
+### The 11 metrics
+
+| Stage | Metrics |
+|-------|---------|
+| Chunking | `chunk_integrity`, `gold_evidence_preservation` |
+| Retrieval | `hit_at_k`, `recall_at_k`, `precision_at_k`, `mrr` |
+| Context | `evidence_coverage`, `noise_ratio`, `context_truncation` |
+| Generation | `faithfulness`, `answer_relevance` |
+
+### Controlled-failure sensitivity analysis
+
+Each injected fault trace is paired with its healthy counterpart, and the
+quality-normalized delta (fault − healthy) is computed per metric. A negative
+delta means degradation. Results are written to
+`outputs/controlled_failure_core_results.csv` and visualized in
+`outputs/controlled_failure_heatmap.png`.
+
+### Tests
+
+```bash
+PYTHONPATH=. python3 -m pytest -q tests/metrics
+# expected: 39 passed
+```
+
+---
+
 # Schemas
 
 - `schemas/source_sample.schema.json` — unified source-sample format (Part A stage 1 output).
@@ -308,6 +357,57 @@ multi-hop question) defines the healthy-trace pool used for fault injection.
 |--------|---------------:|------------:|-----------------:|--------------------------:|
 | BM25 | 293 | 9 | 180 | **94.4%** (18 samples) |
 | Dense | 291 | 9 | 180 | **82.4%** (17 samples) |
+
+### Metric sensitivity (Part C)
+
+| Item | Value |
+|------|------:|
+| Metrics implemented | 11 |
+| Unit tests passing | 39 |
+| Paired fault/healthy records | 360 |
+| Unmatched records | 0 |
+| Expected-direction matches | 32 / 38 |
+| Non-matches | 6 |
+| Skipped results | 4 |
+| Structured errors | 2 |
+
+Clear, correctly-isolated signals were observed for the main fault families:
+`missing_evidence` collapses the retrieval metrics (`hit_at_k`, `recall_at_k` →
+−1.00) without touching generation metrics, while `contradictory_answer` and
+`unsupported_answer` collapse `faithfulness` (−0.93 / −0.89) without touching
+retrieval metrics. This separation is the core evidence that the metrics can
+localize faults to a component.
+
+# Known limitations
+
+Stated explicitly rather than softened, and carried into Future Work:
+
+- **Post-hoc injection, downstream not re-run.** Faults are injected by editing
+  existing trace fields; the pipeline is not re-executed from the faulted stage
+  onward. The bias is metric-dependent: it can *overestimate* `faithfulness`
+  sensitivity (a stale answer paired with a broken context) and *underestimate*
+  the downstream impact of chunk-level faults (context is not rebuilt). Direct
+  edits to the retrieved set (for `recall_at_k`/`mrr`) and to the answer (for the
+  two answer faults) remain valid component-level tests. The current experiment
+  therefore validates **metric sensitivity to local trace perturbations**, not
+  full end-to-end fault propagation.
+- **`corrupted_query` is not end-to-end.** The injection modifies `query` and
+  `generation.final_prompt` only; retrieval, context construction and generation
+  are not re-run, so retrieval metrics barely move. A convincing experiment must
+  re-run the pipeline with the corrupted query.
+- **`context_truncation` was not exercised.** No fault in the current set of nine
+  targets context-budget truncation, so this metric's sensitivity is unvalidated
+  this round.
+- **`chunk_merge` does not move `chunk_integrity`.** `chunk_integrity` checks
+  truncation markers, empty text, illegal offsets and missing/duplicate IDs, but
+  does not detect merged or cross-document concatenated chunks — a gap between
+  the metric definition and the declared expectation.
+- **`gold_evidence_preservation` is unexercised.** It is a chunking-stage metric,
+  while `missing_evidence` operates at the retrieval stage; the flat column is
+  correct stage isolation, not a bug. A dedicated `gold_evidence_loss` fault is
+  needed to validate it.
+- **Empirical full-trace results are English-only.** Russian coverage is limited
+  to demonstrating that the platform produces schema-valid Russian traces.
 
 # Conclusion
 
