@@ -492,6 +492,8 @@ def main():
                                 "irrelevant_document", "unsupported_answer", "contradictory_answer"],
                         help="Fault types to inject")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--language", default="en",
+                        help="Only inject into traces of this language; use 'any' to accept all")
     args = parser.parse_args()
     
     # Чтение данных
@@ -507,14 +509,16 @@ def main():
     
     print(f"Loaded {len(traces)} traces from {args.input}")
     
-    # Проверка: только английские трассы
-    en_traces = [t for t in traces if t.get("language") == "en"]
-    if len(en_traces) < len(traces):
-        print(f"Warning: Found {len(traces) - len(en_traces)} non-English traces. Using only English traces.")
-        traces = en_traces
-    
+    # Language filter (default English; --language any accepts all)
+    if args.language != "any":
+        kept = [t for t in traces if t.get("language") == args.language]
+        if len(kept) < len(traces):
+            print(f"Warning: filtered to {len(kept)} traces with language "
+                  f"'{args.language}' (dropped {len(traces) - len(kept)}).")
+        traces = kept
+
     if not traces:
-        print("Error: No English traces found!")
+        print(f"Error: no traces with language '{args.language}' found!")
         return
     
     # Инициализация инжектора

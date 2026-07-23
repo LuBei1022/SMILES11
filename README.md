@@ -237,9 +237,13 @@ documented structured precision error rather than stopping the batch.
 
 Current limitations:
 
-- The checked-in full-trace files are English only. Russian token handling has
-  unit coverage, but a real Russian full-trace batch is still required for
-  empirical validation.
+- Russian is covered by a 300-trace batch with the full controlled-failure
+  metric-sensitivity experiment (see *Cross-lingual portability* below), which
+  reproduces the English pattern. It is a smaller-scale probe: the healthy pool is
+  145 vs 293, and the lexical faithfulness/relevance metrics are English-calibrated,
+  so absolute Russian metric values are indicative rather than fully calibrated.
+  Trace-level **diagnosis** (rule engine, pipeline aggregation) is not yet run on
+  Russian.
 - The first rule-based `chunk_integrity` baseline detects explicit truncation
   but does not yet reliably identify semantic chunk fusion (`chunk_merge`).
 - Lexical faithfulness detects many unsupported or contradictory answers but is
@@ -281,3 +285,65 @@ included Recall@K falling to 0 for `missing_evidence`, faithfulness falling to 0
 for `unsupported_answer`, and chunk integrity falling from 1.0 to 0.8 for
 `chunk_truncation`. The unchanged `chunk_merge` integrity and distractor-context
 faithfulness results are reported as limitations rather than hidden.
+
+### Cross-lingual portability (Russian, 300 traces)
+
+The **entire pipeline — trace generation and the controlled-failure evaluation —
+was run unchanged on Russian** (300 samples, BM25), validating portability at both
+the data layer and the evaluation layer.
+
+**Trace generation (data layer):**
+
+| Metric | Russian (BM25) |
+|--------|---------------:|
+| Full traces generated | 300 |
+| Generation success | 300 / 300 (100%) |
+| Retrieval Hit@5 | 98.7% |
+| Retrieval Recall@5 | 77.2% |
+| Gold in context | 98.7% |
+
+The platform produces schema-valid, fully-populated Russian traces with correct
+Russian answers, confirming that the per-dataset adapters, multilingual
+chunking/retrieval, and generation transfer across languages without pipeline
+changes.
+
+**Controlled-failure sensitivity (evaluation layer):** from 145 healthy Russian
+traces, the 9 fault types were injected and the same metric-sensitivity analysis
+was run. The Russian sensitivity pattern closely matches English:
+
+- `missing_evidence` collapses the retrieval metrics (`hit_at_k`, `recall_at_k`
+  → −1.00; `mrr` → −0.93) without touching generation metrics.
+- `contradictory_answer` and `unsupported_answer` collapse `faithfulness`
+  (−0.94) without touching retrieval metrics.
+- `chunk_truncation` moves only `chunk_integrity` (−0.20).
+
+The same known metric gaps (`chunk_merge` vs `chunk_integrity`, unexercised
+`context_truncation`/`gold_evidence_preservation`, weak `corrupted_query`)
+reproduce identically in both languages, confirming they are method-level, not
+language-specific. This upgrades the portability claim from "data layer only" to
+**"the metric sensitivity experiment reproduces the English diagnostic behavior
+on Russian."** Caveats: the Russian healthy pool is smaller (145 vs 293), and the
+lexical `faithfulness`/`answer_relevance` metrics are calibrated on English, so
+their absolute Russian values should be read as a probe rather than a fully
+calibrated measurement.
+
+Reproduce — generation (first stage caps the run at 300; later stages inherit the count):
+
+```bash
+python scripts/run_chunking.py   --input datasets/normalized/russian_source.jsonl --output datasets/chunked/russian_chunks.jsonl --limit 300
+python scripts/run_retrieval.py  --input datasets/chunked/russian_chunks.jsonl    --output datasets/retrieved/russian_bm25.jsonl --method bm25 --top-k 5
+python scripts/run_context.py    --input datasets/retrieved/russian_bm25.jsonl    --output datasets/context/russian_bm25_context.jsonl
+python scripts/run_generation.py --input datasets/context/russian_bm25_context.jsonl --output datasets/traces/russian_bm25_glm.jsonl \
+  --pipeline-id ru_bm25_glm45flash_baseline_v1 --backend zhipu --model glm-4.5-flash --max-output-tokens 512 --sleep 1 --resume
+```
+
+Reproduce — evaluation (fault injection uses `--language ru`; the analysis reuses
+the English scripts against a Russian-only data root):
+
+```bash
+python scripts/extract_healthy.py    -i datasets/traces/russian_bm25_glm.jsonl -o datasets/ru_eval/healthy_traces/healthy_bm25.jsonl
+python src/data/fault_injection.py   -i datasets/ru_eval/healthy_traces/healthy_bm25.jsonl -o datasets/ru_eval/controlled_failures_bm25 -c 20 --seed 42 --language ru
+python scripts/analyze_controlled_failures.py --data-root datasets/ru_eval \
+  --core-csv-output outputs/controlled_failure_core_results_ru.csv \
+  --heatmap-output outputs/controlled_failure_heatmap_ru.png
+```
