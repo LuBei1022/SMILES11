@@ -1,47 +1,39 @@
-# SMILES 2026 — RAG Trace Platform & Fault-Diagnosis Data Framework
+# RAG Trace Platform
 
 Part of the SMILES 2026 project *"Automatic Evaluation & Fault-Diagnosis Framework for RAG"*.
 
-This repository covers the **data and metric side** of the project, in three parts:
+This repository is the **RAG experiment platform**: it takes heterogeneous raw QA
+datasets (English and Russian), runs them through a fully configurable, fully
+logged RAG pipeline, and emits **complete traces** — one record per question
+capturing every stage from source documents to the final generated answer.
 
-- **Part A — RAG Trace Platform.** Takes heterogeneous raw QA datasets (English
-  and Russian), runs them through a fully configurable, fully logged RAG
-  pipeline, and emits **complete traces** — one record per question capturing
-  every stage from source documents to the generated answer.
-- **Part B — Quality Check & Fault Injection.** Takes those complete traces,
-  validates their quality, extracts *healthy* traces (gold evidence present),
-  injects nine controlled fault types, and cross-checks against human
-  annotation to produce a labeled test set.
-- **Part C — Metric Engine.** Computes 11 component-level metrics over the
-  traces and measures each metric's sensitivity to every injected fault type
-  (paired fault-vs-healthy deltas), producing the evidence that the metrics can
-  actually localize faults.
-
-The metric outputs feed the **diagnosis layer** (trace-level fault labelling and
-pipeline-level aggregation), which is the remaining downstream step. Fault
-labels live in the trace as ground truth and must never be read by the
+These traces are the input for the *separate* evaluation & diagnosis framework
+(metrics, fault localization, pipeline-level aggregation), which is intentionally
+kept in a different codebase so that fault-injection labels never leak into the
 evaluator.
 
-## End-to-end pipeline
+## Pipeline status
 
 ```
-Part A — Trace generation
-  Raw data → Chunking → Retrieval → Context → Generation → Full traces
-     [done]    [done]     [done]      [done]     [done]       [done]
-
-Part B — Quality & fault injection
-  Full traces → Quality check → Healthy traces → Fault injection →
-                Annotation templates → Human validation → Comparison
-     [done]        [done]           [done]           [done]        [done]
-
-Part C — Metric Engine
-  Traces + controlled failures → 11 component metrics →
-                                 paired sensitivity analysis
-     [done]                        [done]                 [done]
-
-Downstream: Trace-level diagnosis → Pipeline-level aggregation
-     [in progress]
+Source data  →  Chunking  →  Retrieval  →  Context  →  Generation  →  Full Trace
+   [done]        [done]      [done]        [done]       [done]         [done]
 ```
+
+Everything from raw data to a complete, schema-valid trace runs end to end.
+Fault injection and the downstream metric/diagnosis modules are future work.
+
+## Pipeline stages
+
+| # | Stage | Input | Output | Key metric produced |
+|---|-------|-------|--------|---------------------|
+| 1 | Normalize | raw `.jsonl` (EN / RU) | unified *source samples* | — |
+| 2 | Chunking | source samples | samples + `chunks` | gold-evidence preservation |
+| 3 | Retrieval | chunked samples | samples + `retrieval` | Recall@k / Hit@k |
+| 4 | Context | retrieved samples | samples + `context_construction` | gold-in-context |
+| 5 | Generation | context samples | **full traces** | success rate, latency, tokens |
+
+Each stage only adds its own fields and passes everything else through, so a
+generated trace accumulates the full history of the run.
 
 ## Repository layout
 
@@ -49,8 +41,7 @@ Downstream: Trace-level diagnosis → Pipeline-level aggregation
 SMILES11/
 ├── README.md
 ├── schemas/
-│   ├── source_sample.schema.json      # unified source-sample schema (Part A, stage 1)
-│   └── full_trace.schema.json         # complete-trace schema (Part A output / Part B input)
+│   └── source_sample.schema.json      # unified source-sample JSON Schema (stage 1 output)
 │
 ├── src/
 │   ├── chunking/
@@ -60,13 +51,9 @@ SMILES11/
 │   │   └── dense_retriever.py         # dense / semantic retrieval (multilingual embeddings + cosine)
 │   ├── context/
 │   │   └── context_builder.py         # ranked, deduped, token-budgeted context assembly
-│   ├── generation/
-│   │   ├── prompt_builder.py          # versioned prompts (grounded_v1)
-│   │   └── llm_client.py              # swappable backends: ZhipuClient (GLM) / GeminiClient / DryRunClient
-│   ├── data/
-│   │   ├── quality_checker.py         # trace quality validation (Part B)
-│   │   └── fault_injection.py         # controlled fault generation (Part B)
-│   └── metrics/                       # 11 component-level metrics (Part C)
+│   └── generation/
+│       ├── prompt_builder.py          # versioned prompts (grounded_v1)
+│       └── llm_client.py              # swappable LLM backends: ZhipuClient (GLM) / GeminiClient / DryRunClient
 │
 ├── scripts/                           # one CLI per stage; each takes --input / --output
 │   ├── normalize_english_data.py      # HotpotQA (EN)  -> source samples
@@ -74,61 +61,50 @@ SMILES11/
 │   ├── run_chunking.py                # + gold-evidence preservation check
 │   ├── run_retrieval.py               # --method bm25|dense ; + Recall@k / Hit@k
 │   ├── run_context.py                 # + gold-in-context check
-│   ├── run_generation.py              # calls the LLM, assembles & writes full traces
-│   ├── extract_healthy.py             # keep traces whose gold evidence is in context
-│   ├── create_injection_template.py   # build human-annotation CSV templates
-│   └── compare_with_human.py          # expected vs human labels
+│   └── run_generation.py              # calls the LLM, assembles & writes full traces
 │
-├── data/
-│   ├── raw/                           # original inputs (kept local, not committed)
-│   │   ├── gpt_3.5_turbo.jsonl        # English HotpotQA-style, GPT-3.5 legacy answers
-│   │   └── retrieval_dataset.jsonl    # Russian retrieval QA
-│   ├── normalized/                    # stage 1 output
-│   ├── chunked/                       # stage 2 output
-│   ├── retrieved/                     # stage 3 output
-│   ├── context/                       # stage 4 output
-│   ├── traces/                        # stage 5 output — full traces
-│   │   ├── english_bm25_glm.jsonl
-│   │   └── english_dense_glm.jsonl
-│   ├── healthy_traces/                # Part B: gold-present traces
-│   └── controlled_failures/           # Part B: injected-fault traces (bm25/ , dense/)
-│
-├── docs/
-│   ├── annotation_guideline.md        # annotation instructions (Part B)
-│   └── metric_engine_design.md        # metric definitions & rationale (Part C)
-│
-├── tests/
-│   └── metrics/                       # 39 unit tests for the metric engine
-│
-├── outputs/                           # quality reports, problematic traces,
-│   ├── controlled_failure_core_results.csv   # paired fault-vs-healthy deltas
-│   └── controlled_failure_heatmap.png        # metric sensitivity heatmap
-│
-└── experiments/
-    └── human_validation/              # annotation results & comparison reports
+└── data/
+    ├── raw/                           # original inputs (kept local, not committed)
+    │   ├── gpt_3.5_turbo.jsonl        # English HotpotQA-style, GPT-3.5 legacy answers
+    │   └── retrieval_dataset.jsonl    # Russian retrieval QA
+    ├── normalized/                    # stage 1 output
+    ├── chunked/                       # stage 2 output
+    ├── retrieved/                     # stage 3 output
+    ├── context/                       # stage 4 output
+    └── traces/                        # stage 5 output — the deliverable
 ```
 
-## Install dependencies
+## Design notes
+
+**Unified source schema.** The English and Russian datasets have very different
+shapes (EN: structured multi-doc context + `supporting_facts`; RU: a single
+concatenated context blob + a gold passage). Both are normalized into one
+`source_sample` format via per-dataset adapters, so every downstream stage is
+dataset-agnostic. Gold evidence is stored uniformly: `document_id` + `gold_text`
+always, plus `sentence_index` (EN) or character offsets (RU).
+
+**Per-sample retrieval.** Each question is retrieved against *its own* candidate
+pool (mirroring how both datasets are built and guaranteeing the gold passage is
+in-pool), rather than a global index.
+
+**Config transparency & reproducibility.** Every stage records its configuration
+into the trace (chunk size, tokenizer, retriever, top-k, embedding model, prompt
+version, model name, temperature). Unknown upstream config is marked explicitly
+rather than fabricated. `temperature=0` and fixed prompt versions keep runs
+reproducible.
+
+**Two-system boundary.** This platform produces traces; it does **not** score
+them. Fault-injection labels (future) will live only in the trace as ground
+truth and must never be read by the evaluator.
+
+## How to run
+
+Install dependencies:
 
 ```bash
 pip install tiktoken rank_bm25 sentence-transformers numpy jsonschema zhipuai
 # (google-genai only needed if using the optional --backend gemini)
 ```
-
----
-
-# Part A — Trace generation
-
-Each stage only adds its own fields and passes everything else through, so a
-generated trace accumulates the full history of the run.
-
-| # | Stage | Input | Output | Key metric produced |
-|---|-------|-------|--------|---------------------|
-| 1 | Normalize | raw `.jsonl` (EN / RU) | unified *source samples* | — |
-| 2 | Chunking | source samples | samples + `chunks` | gold-evidence preservation |
-| 3 | Retrieval | chunked samples | samples + `retrieval` | Recall@k / Hit@k |
-| 4 | Context | retrieved samples | samples + `context_construction` | gold-in-context |
-| 5 | Generation | context samples | **full traces** | success rate, latency, tokens |
 
 Run the full pipeline (English, BM25 baseline shown):
 
@@ -164,10 +140,11 @@ python scripts/run_generation.py \
   --max-output-tokens 512 --sleep 1 --resume
 ```
 
+The generation backend is swappable: `--backend zhipu` (GLM, current default choice),
+`--backend gemini` (Google Gemini), or `--backend dry-run` (offline placeholder).
+
 Russian: swap the raw input and use `normalize_russian_data.py`; all later stages
-are identical. The generation backend is swappable: `--backend zhipu` (GLM,
-current default choice), `--backend gemini` (Google Gemini), or `--backend
-dry-run` (offline placeholder).
+are identical.
 
 ### Useful flags
 
@@ -178,157 +155,7 @@ dry-run` (offline placeholder).
   after hitting rate limits.
 - `--sleep S` on generation — pause between calls to respect free-tier rate limits.
 
----
-
-# Part B — Quality check & fault injection
-
-Consumes the full traces from Part A. Commands below show BM25; for Dense,
-replace `bm25` with `dense` in the file paths.
-
-### 1. Quality check
-
-```bash
-python src/data/quality_checker.py \
-  -i data/traces/english_bm25_glm.jsonl \
-  -o outputs/data_quality_report_bm25.json \
-  -p outputs/problematic_traces_bm25.jsonl
-```
-
-### 2. Extract healthy traces
-
-Keeps only traces whose gold evidence is present in the context (needed as a
-clean baseline for controlled fault injection).
-
-```bash
-python scripts/extract_healthy.py \
-  -i data/traces/english_bm25_glm.jsonl \
-  -o data/healthy_traces/healthy_bm25.jsonl
-```
-
-### 3. Fault injection
-
-```bash
-python src/data/fault_injection.py \
-  -i data/healthy_traces/healthy_bm25.jsonl \
-  -o data/controlled_failures_bm25 \
-  -c 20 \
-  --seed 42
-```
-
-### 4. Create annotation templates
-
-```bash
-python scripts/create_injection_template.py \
-  -i data/controlled_failures_bm25 \
-  -o experiments/human_validation/annotation_template_bm25.csv \
-  -n 30
-```
-
-### 5. Human validation
-
-Open the generated `annotation_template_*.csv` and manually assign the fault
-class for each sample. Supported labels: `retrieval`, `chunking`, `generation`,
-`out_of_scope`, `unknown`. Save the completed file as
-`annotation_results_bm25.csv` / `annotation_results_dense.csv`.
-
-### 6. Compare human vs expected
-
-```bash
-python scripts/compare_with_human.py \
-  --human experiments/human_validation/annotation_results_bm25.csv \
-  --output experiments/human_validation/comparison_report_bm25.json \
-  --csv-report experiments/human_validation/comparison_results_bm25.csv
-```
-
-### Fault types
-
-| Fault type | Expected diagnosis |
-|------------|--------------------|
-| missing_evidence | retrieval |
-| chunk_truncation | chunking |
-| chunk_merge | chunking |
-| distractor_context | chunking / retrieval |
-| corrupted_query | unknown |
-| out_of_scope | out_of_scope |
-| irrelevant_document | retrieval |
-| unsupported_answer | generation |
-| contradictory_answer | generation |
-
----
-
-# Part C — Metric Engine
-
-Computes component-level metrics over full traces, then measures how each metric
-responds to each injected fault. Design rationale and per-metric definitions live
-in `docs/metric_engine_design.md`.
-
-### The 11 metrics
-
-| Stage | Metrics |
-|-------|---------|
-| Chunking | `chunk_integrity`, `gold_evidence_preservation` |
-| Retrieval | `hit_at_k`, `recall_at_k`, `precision_at_k`, `mrr` |
-| Context | `evidence_coverage`, `noise_ratio`, `context_truncation` |
-| Generation | `faithfulness`, `answer_relevance` |
-
-### Controlled-failure sensitivity analysis
-
-Each injected fault trace is paired with its healthy counterpart, and the
-quality-normalized delta (fault − healthy) is computed per metric. A negative
-delta means degradation. Results are written to
-`outputs/controlled_failure_core_results.csv` and visualized in
-`outputs/controlled_failure_heatmap.png`.
-
-### Tests
-
-```bash
-PYTHONPATH=. python3 -m pytest -q tests/metrics
-# expected: 39 passed
-```
-
----
-
-# Schemas
-
-- `schemas/source_sample.schema.json` — unified source-sample format (Part A stage 1 output).
-- `schemas/full_trace.schema.json` — complete trace format (Part A output, Part B input).
-  Downstream code should validate traces against this and read fields from it.
-
-```python
-import json, jsonschema
-schema = json.load(open("schemas/full_trace.schema.json"))
-for line in open("data/traces/english_bm25_glm.jsonl", encoding="utf-8"):
-    jsonschema.validate(json.loads(line), schema)
-```
-
-# Design notes
-
-**Unified source schema.** The English and Russian datasets have very different
-shapes (EN: structured multi-doc context + `supporting_facts`; RU: a single
-concatenated context blob + a gold passage). Both are normalized into one
-`source_sample` format via per-dataset adapters, so every downstream stage is
-dataset-agnostic. Gold evidence is stored uniformly: `document_id` + `gold_text`
-always, plus `sentence_index` (EN) or character offsets (RU).
-
-**Per-sample retrieval.** Each question is retrieved against *its own* candidate
-pool (mirroring how both datasets are built and guaranteeing the gold passage is
-in-pool), rather than a global index.
-
-**Config transparency & reproducibility.** Every stage records its configuration
-into the trace (chunk size, tokenizer, retriever, top-k, embedding model, prompt
-version, model name, temperature). Unknown upstream config is marked explicitly
-rather than fabricated. Chunking and retrieval are deterministic; `temperature=0`
-and fixed prompt versions minimize generation variance.
-
-**Two-system boundary.** Part A produces traces; Part B labels them. Fault-injection
-labels live in the trace only as ground truth and must never be read by the
-evaluation/diagnosis framework, to avoid cheating.
-
----
-
-# Results (English, 500 traces)
-
-### Retrieval baselines (Part A)
+## Current baselines (English, full 500 samples)
 
 | Retriever | Hit@5 | Recall@5 |
 |-----------|-------|----------|
@@ -338,83 +165,119 @@ evaluation/diagnosis framework, to avoid cheating.
 BM25 and dense retrieval are essentially tied on this multi-hop data, with BM25
 marginally ahead.
 
-### Quality check (Part B)
+## Metric Engine
 
-| Metric | BM25 | Dense |
-|--------|------|-------|
-| Usable traces | 496 (99.2%) | 497 (99.4%) |
-| Gold present (any) | 487 (97.4%) | 482 (96.4%) |
-| Gold present (all) | 293 (58.6%) | 291 (58.2%) |
-| Gold missing | 13 (2.6%) | 18 (3.6%) |
+The first-version Metric Engine evaluates full traces without changing them. It
+computes 11 CPU-friendly metrics across retrieval, chunking, context
+construction, and answer generation. English and Russian text are supported.
 
-The "gold present (any)" figures match the Part A retrieval Hit@5, confirming the
-two measurements are consistent. "Gold present (all)" (both supporting docs for a
-multi-hop question) defines the healthy-trace pool used for fault injection.
+Install the Metric Engine test and configuration dependencies:
 
-### Fault injection & human validation (Part B)
+```bash
+pip install pytest PyYAML matplotlib
+```
 
-| Method | Healthy traces | Fault types | Total injections | Human-validation accuracy |
-|--------|---------------:|------------:|-----------------:|--------------------------:|
-| BM25 | 293 | 9 | 180 | **94.4%** (18 samples) |
-| Dense | 291 | 9 | 180 | **82.4%** (17 samples) |
+Run all metrics:
 
-### Metric sensitivity (Part C)
+```bash
+python scripts/run_metrics.py \
+  --input data/traces/english_bm25_glm.jsonl \
+  --output outputs/metrics_english_bm25.jsonl \
+  --config configs/metrics_default.yaml
+```
 
-| Item | Value |
-|------|------:|
-| Metrics implemented | 11 |
-| Unit tests passing | 39 |
-| Paired fault/healthy records | 360 |
-| Unmatched records | 0 |
-| Expected-direction matches | 32 / 38 |
-| Non-matches | 6 |
-| Skipped results | 4 |
-| Structured errors | 2 |
+The output contains one `MetricResult` JSON object per metric and trace. Every
+record includes a normalized score or `null`, a label, `ok`/`skipped`/`error`
+status, auditable evidence, effective configuration, warnings, and runtime.
 
-Clear, correctly-isolated signals were observed for the main fault families:
-`missing_evidence` collapses the retrieval metrics (`hit_at_k`, `recall_at_k` →
-−1.00) without touching generation metrics, while `contradictory_answer` and
-`unsupported_answer` collapse `faithfulness` (−0.93 / −0.89) without touching
-retrieval metrics. This separation is the core evidence that the metrics can
-localize faults to a component.
+The Metric Engine never reads `injected_fault`. Controlled-failure or human
+labels may be read only by the separate offline validation command:
 
-# Known limitations
+```bash
+python scripts/validate_metrics.py \
+  --metrics outputs/diagnosis.jsonl \
+  --labels experiments/human_validation/annotation_results_bm25.csv \
+  --output outputs/metric_label_validation.json
+```
 
-Stated explicitly rather than softened, and carried into Future Work:
+Compare repeated Metric Engine runs:
 
-- **Post-hoc injection, downstream not re-run.** Faults are injected by editing
-  existing trace fields; the pipeline is not re-executed from the faulted stage
-  onward. The bias is metric-dependent: it can *overestimate* `faithfulness`
-  sensitivity (a stale answer paired with a broken context) and *underestimate*
-  the downstream impact of chunk-level faults (context is not rebuilt). Direct
-  edits to the retrieved set (for `recall_at_k`/`mrr`) and to the answer (for the
-  two answer faults) remain valid component-level tests. The current experiment
-  therefore validates **metric sensitivity to local trace perturbations**, not
-  full end-to-end fault propagation.
-- **`corrupted_query` is not end-to-end.** The injection modifies `query` and
-  `generation.final_prompt` only; retrieval, context construction and generation
-  are not re-run, so retrieval metrics barely move. A convincing experiment must
-  re-run the pipeline with the corrupted query.
-- **`context_truncation` was not exercised.** No fault in the current set of nine
-  targets context-budget truncation, so this metric's sensitivity is unvalidated
-  this round.
-- **`chunk_merge` does not move `chunk_integrity`.** `chunk_integrity` checks
-  truncation markers, empty text, illegal offsets and missing/duplicate IDs, but
-  does not detect merged or cross-document concatenated chunks — a gap between
-  the metric definition and the declared expectation.
-- **`gold_evidence_preservation` is unexercised.** It is a chunking-stage metric,
-  while `missing_evidence` operates at the retrieval stage; the flat column is
-  correct stage isolation, not a bug. A dedicated `gold_evidence_loss` fault is
-  needed to validate it.
-- **Empirical full-trace results are English-only.** Russian coverage is limited
-  to demonstrating that the platform produces schema-valid Russian traces.
+```bash
+python scripts/validate_metrics.py \
+  --runs outputs/metrics_run_1.jsonl outputs/metrics_run_2.jsonl \
+  --output outputs/metric_repeatability.json
+```
 
-# Conclusion
+The rule-based answer relevance and faithfulness metrics are transparent
+baselines. Faithfulness measures lexical context support and must not be
+reported as an NLI or LLM-Judge result. Diagnosis, trace-level fault labels,
+and pipeline-level aggregation remain downstream work.
 
-- The RAG platform produces complete, schema-valid traces end to end for both
-  retrieval baselines.
-- Quality checking validates data at 99%+ usability; the healthy-trace pool is
-  extracted from the traces where all gold evidence is in context.
-- Nine controlled fault types are injected for both retrieval methods, and human
-  validation confirms the framework's reliability.
-- The labeled traces are ready for the downstream diagnosis modules.
+### Metric Engine validation (2026-07-20)
+
+The complete metric test suite passes with 32 tests. Full local runs produced:
+
+| Input | Traces | Metric results | Skipped | Errors |
+|---|---:|---:|---:|---:|
+| English BM25 traces | 500 | 5,500 | 8 | 0 |
+| English Dense traces | 500 | 5,500 | 6 | 0 |
+| Healthy BM25 traces | 293 | 3,223 | 6 | 0 |
+| Healthy Dense traces | 291 | 3,201 | 2 | 0 |
+
+All skipped results were generation metrics where an upstream trace had an
+empty answer or context. They remain `skipped/unknown` and are not converted to
+zero scores.
+
+Offline runs also processed 360 controlled-failure traces after extracting the
+inner full trace from each validation wrapper. The truncation injection reduced
+mean `chunking.chunk_integrity` from 1.0 to 0.8 for both BM25 and Dense samples;
+unsupported-answer faithfulness fell to 0.0, and missing-evidence retrieval
+recall fell to 0.0. Empty retrieval in two missing-evidence samples produced the
+documented structured precision error rather than stopping the batch.
+
+Current limitations:
+
+- The checked-in full-trace files are English only. Russian token handling has
+  unit coverage, but a real Russian full-trace batch is still required for
+  empirical validation.
+- The first rule-based `chunk_integrity` baseline detects explicit truncation
+  but does not yet reliably identify semantic chunk fusion (`chunk_merge`).
+- Lexical faithfulness detects many unsupported or contradictory answers but is
+  not a replacement for multilingual NLI or an LLM Judge.
+
+### Paired controlled-failure experiment
+
+Run the 9 controlled fault types for BM25 and Dense as paired comparisons
+against their original healthy traces:
+
+```bash
+python scripts/analyze_controlled_failures.py \
+  --data-root data \
+  --config configs/metrics_default.yaml \
+  --json-output outputs/controlled_failure_report.json \
+  --csv-output outputs/controlled_failure_summary.csv \
+  --core-csv-output outputs/controlled_failure_core_results.csv \
+  --heatmap-output outputs/controlled_failure_heatmap.png \
+  --heatmap-pdf-output outputs/controlled_failure_heatmap.pdf
+```
+
+On Yandex DataSphere, use `--data-root datasets` when the uploaded data folder
+is named `datasets/`.
+
+The experiment removes `injected_fault` before every Metric Engine call. Fault
+labels are used only after scoring to group the paired deltas. For every
+retriever, fault type, and metric, the CSV reports healthy/fault means, mean and
+median paired delta, population standard deviation, quality improvement or
+degradation counts, expected direction agreement, and skipped/error counts.
+It also reports a deterministic paired-bootstrap 95% confidence interval,
+standardized paired effect, and rank-biserial effect. The core CSV retains only
+pre-declared fault/metric relationships, while the heatmap shows
+quality-normalized deltas where negative values consistently mean degradation.
+
+The first complete local run paired all 360 controlled records with their
+healthy originals and had zero unmatched records. Of 38 pre-declared
+fault/metric direction checks, 32 matched the expected direction. Strong signals
+included Recall@K falling to 0 for `missing_evidence`, faithfulness falling to 0
+for `unsupported_answer`, and chunk integrity falling from 1.0 to 0.8 for
+`chunk_truncation`. The unchanged `chunk_merge` integrity and distractor-context
+faithfulness results are reported as limitations rather than hidden.
