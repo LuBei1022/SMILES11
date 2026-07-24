@@ -1,0 +1,9 @@
+{
+  "run_count": 2,
+  "result_count": 5500,
+  "exact_matches": 5500,
+  "exact_match_rate": 1.0,
+  "mean_absolute_score_delta": 0.0,
+  "missing_results": [],
+  "warnings": []
+}
